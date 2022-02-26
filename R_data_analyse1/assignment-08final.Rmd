@@ -1,0 +1,533 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+```{r gbinom, include=FALSE}
+## old code to visualize the binomial distribution
+## I want to edit it to make it easier to use in conjunction
+## with other ggplot2 functions and arguments
+gbinom = function(n,p,scale=FALSE,
+                  a=ifelse(scale,floor(n*p-4*sqrt(n*p*(1-p))),0),
+                  b=ifelse(scale,ceiling(n*p+4*sqrt(n*p*(1-p))),n),
+                  main=NULL,...) {
+  # load the ggplot2
+  require(ggplot2)
+  # make sure a and b are integers
+  a = round(a)
+  b = round(b)
+  # make sure a < b
+  if(a > b) {
+    temp = a
+    a = b
+    b = temp
+  }
+  # make sure a and b are in range
+  if(a < 0)
+    a = 0
+  if(b > n)
+    b = n
+  # create the sequence of possible values to graph
+  x = seq(a,b)
+  # compute the probabilities to graph
+  probability = dbinom(x,n,p)
+  # Choose a title for the plot if one is not passed
+  if(is.null(main))
+    main = paste("Binomial(",n,",",p,")")
+  
+  # save the graph as an object which can be returned
+  df = data.frame(x,probability)
+  graph = ggplot(df,aes(x=x,y=probability,xend=x,yend=0),...) +
+      geom_segment(...) +
+      xlab('x') +
+      ylab('Probability') +
+      geom_hline(yintercept=0) +
+      ggtitle(main)
+  # return the graph object, but do so invisibly so no output is shown on the screen
+  return ( graph )
+}
+```
+
+```{r gnorm, include=FALSE}
+geom_norm_density = function(mu=0,sigma=1,a=NULL,b=NULL,color="blue",...)
+{
+  if ( is.null(a) )
+  {
+    a = qnorm(0.0001,mu,sigma)
+  }
+  if ( is.null(b) )
+  {
+    b = qnorm(0.9999,mu,sigma)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    y=dnorm(x,mu,sigma)
+  )
+  geom_line(data=df,aes(x=x,y=y),color=color,...)
+}
+
+geom_norm_fill = function(mu=0,sigma=1,a=NULL,b=NULL,
+                          fill="firebrick4",...)
+{
+  if ( is.null(a) )
+  {
+    a = qnorm(0.0001,mu,sigma)
+  }
+  if ( is.null(b) )
+  {
+    b = qnorm(0.9999,mu,sigma)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    ymin=rep(0,length(x)),
+    ymax = dnorm(x,mu,sigma)
+  )
+  geom_ribbon(data=df,aes(x=x,ymin=ymin,ymax=ymax),fill=fill,...)
+}
+
+gnorm = function(mu=0,sigma=1,a=NULL,b=NULL,color="blue",
+                 fill=NULL,title=TRUE,...)
+{
+  g = ggplot()
+  
+  if ( !is.null(fill) )
+    g = g + geom_norm_fill(mu,sigma,a,b,fill)
+  
+  g = g +
+    geom_norm_density(mu,sigma,a,b,color,...) +
+    geom_hline(yintercept=0) +
+    ylab('density')
+
+  if ( title )
+    g = g +
+      ggtitle(paste("N(",mu,",",sigma,")"))
+  return ( g )
+}
+
+geom_beta_density = function(alpha=1,beta=1,a=NULL,b=NULL,color="blue",...)
+{
+  if ( is.null(a) )
+  {
+    a = qbeta(0.0001,alpha,beta)
+  }
+  if ( is.null(b) )
+  {
+    b = qbeta(0.9999,alpha,beta)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    y=dbeta(x,alpha,beta)
+  )
+  geom_line(data=df,aes(x=x,y=y),color=color,...)
+}
+
+geom_beta_fill = function(alpha=1,beta=1,a=NULL,b=NULL,
+                          fill="firebrick4",...)
+{
+  if ( is.null(a) )
+  {
+    a = qbeta(0.0001,alpha,beta)
+  }
+  if ( is.null(b) )
+  {
+    b = qbeta(0.9999,alpha,beta)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    ymin=rep(0,length(x)),
+    ymax = dbeta(x,alpha,beta)
+  )
+  geom_ribbon(data=df,aes(x=x,ymin=ymin,ymax=ymax),fill=fill,...)
+}
+
+gbeta = function(alpha,beta,a=NULL,b=NULL,color="blue",fill=NULL,title=TRUE,...)
+{
+  tol = 1e-08
+  if ( alpha < tol || beta < tol )
+    stop("alpha and beta must be positive")
+  if ( is.null(a) || a < 0 )
+    a = 0
+  if ( is.null(b) || b < 0 )
+    b = 1
+  
+  g = ggplot()
+  
+  if ( !is.null(fill) )
+    g = g + geom_beta_fill(alpha,beta,a,b,fill)
+  
+  g = g +
+    geom_beta_density(alpha,beta,a,b,color,...) +
+    geom_hline(yintercept=0) +
+    xlab('x') +
+    ylab('density')
+
+  if ( title )
+    g = g +
+        ggtitle(paste("Beta(",signif(alpha,4),",",signif(beta,4),")"))
+  return ( g )
+}
+
+
+```
+## Assignment 8
+
+### YOUR NAME
+
+#### Due Thursday, November 14
+
+The purpose of this assignment is to examine multiple separate statistical inference methods for proportions.
+
+### Data
+
+The data are in the file `chimpanzee.csv`.
+This data is artificial, but created to match details from a 2011 PNAS paper on chimpanzee prosocial choice,
+
+### Background
+
+Chimpanzees (*Pan troglodytes*) are great apes and the closest related species to humans.
+In the wild, chimpanzees live in social groups,
+typically with many members of the groups closely related.
+While researchers have observed chimpanzees exhibit altruistic behavior in the wild,
+it has been a challenge to measure altruistic behavior in chimpanzees under controlled experimental conditions.
+However, a 2011 PNAS paper presents evidence of prosocial behavior among a group of chimpanzees living in a research center.
+
+In one session of an experiment,
+one female chimpanzee, the *actor*,
+sits in a small room separated by a short distance from another chimpanzee, the *partner*.
+There is a window covered in wire mesh separating the chimpanzees
+so that they can see and hear all in the other room, but cannot touch each other.
+First, the actor is presented with 10 tokens, one at a time, with 5 of each of two colors in some random order.
+For a given session,
+one color is the *prosocial*
+while the other is the *selfish* color.
+When the actor takes the prosocial colored token,
+both the actor and partner receive food (a small piece of fruit wrapped in paper).
+When the actor takes the selfish token, only the actor receives food and the partner receives nothing.
+The purpose of these initial ten trials is to allow the chimpanzees the opportunity to see the consequences of each color choice.
+
+After the ten training trials,
+the actor is presented with bucket that contains 30 tokens with 15 of each color.
+Two paper-wrapped fruit pieces are presented.
+The actor selects a colored token and either the actor only (selfish) or both actor and partner (prosocial) receive food.
+The selected token is replaced so the actor always has equal numbers of each color token to select.
+The actor's choices are recorded over 30 trials.
+
+In the full experiment, seven female chimpanzees served as actors for three sessions, each with different partner.
+These same chimpanzees were sometimes partners when another chimpanzee was the actor.
+For some sessions, the partner was selected from other chimpanzees in the social group at the research center, including the one male member of the group.
+Each actor also went through a session with no partner as a control.
+The researchers did not find any evidence that factors such as relatedness among chimpanzees,
+the identity of the partner,
+the choice of colors,
+dominance in the group hierarchy,
+or other similar potential confounding factors influenced the color choices that the actor made,
+but did find overall that each of the seven actors selected the prosocial token more often than the selfish token when in a session with a partner.
+
+### Problems
+
+### 1
+
+> Make a plot that displays the overall relative frequencies for making the prosocial choice separately for trials when a partner is present and when there is no partner. Use a thin line segment to visualize a 95% confidence interval, a slightly thicker line to visualize the interval one standard error above and below the point estimate, and a point at the point estimate. Add a dashed line at $p=0.5$. Label axes appropriately and add an informative title to the plot.
+
+```{r, eval=TRUE}
+chimps = read_csv("chimpanzee.csv") %>%
+  mutate(with_partner = case_when(
+    partner == "none" ~ "no partner",
+    TRUE ~ "partner")) %>%
+  select(actor,partner,with_partner,everything())
+
+chimps1=chimps %>% 
+  group_by(with_partner) %>% 
+  mutate(n=prosocial+selfish)%>% 
+  summarise(prosocial=sum(prosocial),
+            selfish=sum(selfish),
+            n=prosocial+selfish,
+            p_hat=prosocial/n,
+            se=sqrt(p_hat*(1-p_hat)/n))
+
+ggplot(chimps1,aes(x=with_partner,xend=with_partner))+
+  geom_segment(aes(y=p_hat-1.96*se,yend=p_hat+1.96*se))+
+  geom_segment(aes(y=p_hat-se,yend=p_hat+se),size=1.2)+
+  geom_hline(yintercept = 0.5,color="red",linetype="dashed")+
+  geom_point(aes(y=p_hat),color="red",size=2)+
+  xlab("experiment condition")+
+  ylab("probability")
+```
+
+### 2
+
+> Summarize the data with a data frame with one row for each actor chimpanzee (A-H), and columns for:
+
+- `n`, the number of trials with a partner
+- `prosocial`, the number of prosocial choices with a partner
+- `selfish`, the number of selfish choices with a partner
+- `p_hat`, the observed proportion of prosocial choices in trials with a partner
+- `se_wald`, the estimated standard error using `p_hat` and `n`
+- `a_wald`, the lower boundary of the Wald 95% confidence interval
+- `b_wald`, the upper boundary of the Wald 95% confidence interval
+- `p_tilde`, the Agresti-Coull point estimate of `p`
+- `se_agresti`, the estimated standard error from the Agresi-Coull mathod
+- `a_agresti`, the lower boundary of the Agresti-Coull 95% confidence interval
+- `b_agresti`, the upper boundary of the Agresti-Coull 95% confidence interval
+
+```{r}
+chimps2=chimps %>% 
+  filter(with_partner=="partner") %>% 
+  select(-with_partner) %>% 
+  group_by(actor) %>% 
+  summarise(prosocial=sum(prosocial),
+            selfish=sum(selfish)) %>% 
+  mutate(n=prosocial+selfish,
+         p_hat=prosocial/n,
+         se_wald=sqrt( p_hat*(1-p_hat)/n),
+         a_wald=p_hat-(qnorm(0.975)*se_wald),
+         b_wald=p_hat+(qnorm(0.975)*se_wald),
+         p_tilde = (prosocial+2)/(n+4),
+         se_agresti = ( sqrt( p_tilde*(1-p_tilde)/n) ),
+         a_agresti=p_tilde-(qnorm(0.975)*se_agresti),
+         b_agresti=p_tilde+(qnorm(0.975)*se_agresti))
+```
+
+### 3
+
+> Make a plot with two line segments for each actor chimpanzee, one displaying the Wald 95% confidence interval and one for the Agresti 95% confidence interval. Add a point representing the point estimate to each interval. Plot the line segments for each actor close to one another for easy comparison. Add a dashed line at $p=0.5$. Label axes appropriately and add an informative title to the plot.
+
+```{r, eval=TRUE}
+chimps2 %>% 
+  ggplot()+
+  geom_segment(aes(x=actor,xend=actor,y=a_wald, yend=b_wald),color="red")+
+  geom_point(aes(x=actor,y=p_hat))+
+  geom_segment(aes(x=as.integer(as.factor(actor))+0.3,
+                   xend=as.integer(as.factor(actor))+0.3,
+                   y=a_agresti,yend=b_agresti),color="green",size=1.3)+
+  geom_point(aes(x=as.integer(as.factor(actor))+0.3,
+                   y=p_tilde))+
+  ylab("point estamate")
+```
+
+### 4
+
+> Repeat Problem 2 for the data for trials without partners (for the six chimpanzees involved in such trials).
+
+```{r}
+chimps4=chimps %>% 
+  filter(with_partner=="no partner") %>% 
+  select(-with_partner) %>% 
+  group_by(actor) %>% 
+  summarise(prosocial=sum(prosocial),
+            selfish=sum(selfish)) %>% 
+  mutate(n=prosocial+selfish,
+         p_hat=prosocial/n,
+         se_wald=sqrt( p_hat*(1-p_hat)/n),
+         a_wald=p_hat-(qnorm(0.975)*se_wald),
+         b_wald=p_hat+(qnorm(0.975)*se_wald),
+         p_tilde = (prosocial+2)/(n+4),
+         se_agresti = sqrt( p_tilde*(1-p_tilde)/n),
+         a_agresti=p_tilde-(qnorm(0.975)*se_agresti),
+         b_agresti=p_tilde+(qnorm(0.975)*se_agresti))
+```
+
+### 5
+
+> Repeat Problem 3 for the data for trial without partners.
+
+```{r, eval=TRUE}
+chimps4 %>% 
+  ggplot()+
+  geom_segment(aes(x=actor,xend=actor,y=a_wald, yend=b_wald),color="red")+
+  geom_point(aes(x=actor,y=p_hat))+
+  geom_segment(aes(x=as.integer(as.factor(actor))+0.3,
+                   xend=as.integer(as.factor(actor))+0.3,
+                   y=a_agresti,yend=b_agresti),color="green",size=1.3)+
+  geom_point(aes(x=as.integer(as.factor(actor))+0.3,
+                   y=p_tilde))+
+  ylab("point estamate")
+```
+
+### 6
+
+> Assume a model in which all trials with a partner present are assumed independent with the same prosocial choice probability $p$ for all chimpanzees. Conduct a hypothesis test for $p=0.5$ versus a two-sided alternative. Include all steps as in examples in lecture, finishing with an interpretation of the confidence interval in context of the setting of the data.
+
+```{r}
+##null: p=0.5
+##alt: p !=0.5
+df_6 = chimps %>%
+  filter(with_partner=="partner") %>% 
+  summarise(prosocial=sum(prosocial),
+            selfish=sum(selfish),
+            n=prosocial+selfish,
+            p_mean=prosocial/n,
+            p = 0.5,
+            se = sqrt(p*(1-p)/n),
+            z = (p-p_mean)/se,
+            p_value = 2*pnorm(-abs(z)))
+
+df_6$p_value
+pbinom(df_6$selfish,df_6$n,0.5)*2
+
+df_6$p_mean+1.96*df_6$se
+df_6$p_mean-1.96*df_6$se
+### both p value and confidence interval shows evidence that we should reject the null hypothsis, p value<0.05 and the confidense interval is between 0.6282036 and 0.5488455, which is higher than the 0.5. 
+```
+
+### 7
+
+> Repeat Problem 6 using the data in trials without a partner.
+
+```{r}
+df_7 = chimps %>%
+  filter(with_partner=="no partner") %>% 
+  summarise(prosocial=sum(prosocial),
+            selfish=sum(selfish),
+            n=prosocial+selfish,
+            p_mean=mean(prosocial/n),
+            p = 0.5,
+            se = sqrt(p*(1-p)/n),
+            z = (p-p_mean)/se,
+            p_value = 2*pnorm(-abs(z)))
+
+df_7$p_value
+pbinom(df_7$prosocial,df_7$n,0.5)*2
+df_7$p_mean+1.96*df_7$se
+df_7$p_mean-1.96*df_7$se
+```
+
+### 8
+
+> Assuming the model from problem 6, compute the Wald and Agresti confidence intervals for $p$.
+
+```{r}
+p_hat=359/610
+se_wald=sqrt(p_hat*(1-p_hat)/610)
+p_tilde=361/614
+se_agresti=sqrt(p_tilde*(1-p_tilde)/610)
+
+p_hat+1.96*se_wald
+p_hat-1.96*se_wald
+
+p_tilde+1.96*se_agresti
+p_tilde-1.96*se_agresti
+```
+
+### 9
+
+> Using the statistical model from Problem 6, assume a $\text{Beta}(2,2)$ prior density for the prosocial probability probability $p$ for all chimpanzees. Determine the distribution of the posterior density of $p$ given the data.
+On the same graph, display the prior and posterior densities for $p$.
+Find the 0.025 and 0.975 quantiles of the posterior distribution of $p$ as the intervals of a 95% credible region for $p$.
+How does this region compare to the confidence intervals from Problem 8?
+
+```{r, eval=TRUE}
+gbeta(359,251,color = "red",a=0.5,b=0.7)+
+  geom_beta_density(361,253)
+
+qbeta(0.975,359,251)
+qbeta(0.025,359,251)
+
+##on the grath, we can see the prior beta(2,2) made tiny difference on the graph, which push the plot more close to the center. 
+##p hat= 0.6275768 & 0.5494724, p tilde= 0.6270083 & 0.5488875, qbeta= 0.6272549 & 0.5492444
+##they are really similar with each other. 
+```
+
+### 10
+
+> Assume that all trials are independent with probabilities of making the prosocial choice affected only by the presence or absence of a partner, and not by the colors of the tokens or the identity of a partner. For chimpanzee B, find a confidence interval for the difference in probabilities of making the prosocial choice with and without a partner using a simulation to estimate the sampling distribution for the difference in proportions.
+
+```{r, eval=TRUE}
+chimp_b = chimps %>%
+  filter(actor == "B") %>%
+  group_by(with_partner) %>%
+  summarize(prosocial = sum(prosocial),
+            selfish = sum(selfish),
+            n = prosocial + selfish,
+            p_hat = prosocial / n)
+
+N = 100000
+df = tibble(
+  p_hat_1 = rbinom(N,90,chimp_b$p_hat[2]) / 90,
+  p_hat_2 = rbinom(N,30,chimp_b$p_hat[1]) / 30,
+  diff = p_hat_1 - p_hat_2)
+
+ci_rand = df %>%
+  summarize(se = sd(diff),
+            est = chimp_b$p_hat[2] - chimp_b$p_hat[1],
+            z = qnorm(0.975),
+            a = est - z*se,
+            b = est + z*se)
+ci_rand$a
+ci_rand$b
+
+
+## examine approximate normal assumption
+
+#ggplot(df, aes(x=diff)) +
+#  geom_density() +
+#  geom_norm_density(
+#    mu = mean(df$diff),
+#    sigma = sd(df$diff)) +
+#  theme_bw() 
+```
+
+### 11
+
+> The standard error for the difference in proportions from two independent samples is given by the formula
+$$
+\text{SE}(p_1 - p_2) =
+  \sqrt{ \frac{p_1(1-p_1)}{n_1} + \frac{p_2(1-p_2)}{n_2} }
+$$
+Use this formula to find 95% confidence intervals for the difference in prosocial probabilities when a partner is present or not for chimpanzee B, first, using the Wald method for each point estimate and standard error, and then, using the Agresti-Coull method. How do each of these intervals compare to the interval from Problem 10?
+
+```{r}
+p_1=chimp_b$p_hat[2]
+p_2=chimp_b$p_hat[1]
+n_1=chimp_b$n[2]
+n_2=chimp_b$n[1]
+diff = chimp_b$p_hat[2] - chimp_b$p_hat[1]
+se = sqrt(p_1*(1-p_1)/n_1+p_2*(1-p_2)/n_2)
+z = qnorm(0.975)
+cidiff = diff + c(-1,1) * z * se
+cidiff
+
+chimp_b=chimp_b %>% 
+  mutate(n_tilde=n+4,
+         p_tilde=(prosocial+2)/n_tilde)
+p_11=chimp_b$p_tilde[2]
+p_22=chimp_b$p_tilde[1]
+n_11=chimp_b$n_tilde[2]
+n_22=chimp_b$n_tilde[1]
+diff0 = chimp_b$p_tilde[2] - chimp_b$p_tilde[1]
+se0 = sqrt(p_11*(1-p_11)/n_11+p_22*(1-p_22)/n_22)
+z = qnorm(0.975)
+cidiff = diff0 + c(-1,1) * z * se0
+cidiff
+
+###by using a simulation to estimate the sampling distribution for the difference in proportions, I got range of -0.0694522 to 0.3361189, and by standard error of wald, I got -0.07002587  0.33669253, compareing to the Agresti-Coull method, get result -0.06303228  0.32335769. All three methods are kind close to each other. 
+
+```
+

@@ -1,0 +1,162 @@
+---
+title: "h5"
+author: "Yating Tian"
+date: "3/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1. Describe the null hypotheses to which the p-values given in Table 3.4 correspond. Explain what conclusions you can draw based on these p-values. Your explanation should be phrased in terms of sales, TV, radio, and newspaper, rather than in terms of the coefficients of the linear model.
+
+**The null hypothese is that the budgets of the TV, radio and newspaper advertisement have no effect on sale. Based on the p value in the table, we can say that we have enough evidence to reject the null hypothesis of TV and radio, which is we reject that the budgets of the TV, radio advertisement have no effect on sale. But we don't have the strong evidence to reject that newspaper's null hypothesis, which means we cannot reject that the budgets of newspaper advertisement have no effect on sale.**
+
+3. Suppose we have a data set with five predictors, X1 = GPA, X2 = IQ, X3 = Gender (1 for Female and 0 for Male), X4 = Interaction between GPA and IQ, and X5 = Interaction between GPA and Gender. The response is starting salary after graduation (in thousands of dollars).Suppose we use least squares to fit the model, and get βˆ0 = 50, βˆ1 =
+20, βˆ2 = 0.07, βˆ3 = 35, βˆ4 = 0.01, βˆ5 = −10.
+
+(a) Which answer is correct, and why?
+i. For a fixed value of IQ and GPA, males earn more on average than females.
+ii. For a fixed value of IQ and GPA, females earn more on average than males.
+iii. For a fixed value of IQ and GPA, males earn more on average than females provided that the GPA is high enough.
+iv. For a fixed value of IQ and GPA, females earn more on average than males provided that the GPA is high enough.
+
+**p_hat_male=50 + 20xGPA + 0.07xIQ + 35xgender(0) + 0.01xGPAxIQ + -10xGPAxgender(0). p_hat_female=50+35xgender(1) + 20xGPA- 10xGPAxgender(1) + 0.07xIQ +0.01xGPAxIQ.narrow down to p_hat_male=50 + 20xGPA + 0.07xIQ+ 0.01xGPAxIQ p_hat_female=85 + 10xGPA + 0.07xIQ +0.01xGPAxIQ. So when p_hap_male:50+20GPA>= p_hat_female 85+10GPA is true, which is when GPA>=3.5, "GPA is high enough" answer iii is correct. when GPA is higher than 3.5 male has higher start salary than female**
+
+(b) Predict the salary of a female with IQ of 110 and a GPA of 4.0.
+```{r}
+GPA=4.0
+IQ=110
+female3b=85 + 10*GPA + 0.07*110+0.01*GPA*IQ
+female3b
+```
+(c) True or false: Since the coefficient for the GPA/IQ interaction term is very small, there is very little evidence of an interaction effect. Justify your answer.
+
+**False. we must test the hypothesis that β4=0 and look at the p-value to draw the conclusion that there is very little evidence of an interaction effect of GPA and IQ**
+
+4. I collect a set of data (n = 100 observations) containing a single predictor and a quantitative response. I then fit a linear regression
+model to the data, as well as a separate cubic regression, i.e. Y = β0 + β1X + β2X2 + β3X3 + .
+(a) Suppose that the true relationship between X and Y is linear, i.e. Y = β0 + β1X + e. Consider the training residual sum of squares (RSS) for the linear regression, and also the training RSS for the cubic regression. Would we expect one to be lower than the other, would we expect them to be the same, or is there not enough information to tell? Justify your answer.
+
+**The training RSS for the cubic regression might be lower than the the training RSS for the linear regression because the cubic regression have more predictors**
+
+(b) Answer (a) using test rather than training RSS.
+
+**because more predictors might lead to the overfiting, cubic regression get higher test RSS than the liner regression**
+
+(c) Suppose that the true relationship between X and Y is not linear,but we don’t know how far it is from linear. Consider the training RSS for the linear regression, and also the training RSS for the cubic regression. Would we expect one to be lower than the other, would we expect them to be the same, or is there not enough information to tell? Justify your answer.
+
+**cubic regression has lower train RSS than the linear fit because it has higher flexibility**
+
+(d) Answer (c) using test rather than training RSS.
+
+**Because of the bias-variance trade off, we can not tell which level of flexibility fits data better.**
+
+15. This problem involves the Boston data set, which we saw in the lab for this chapter. We will now try to predict per capita crime rate using the other variables in this data set. In other words, per capita crime rate is the response, and the other variables are the predictors.
+
+```{r}
+#(a) For each predictor, fit a simple linear regression model to predict the response. Describe your results. In which of the models is there a statistically significant association between the predictor and the response? Create some plots to back up your assertions.
+library(MASS)
+library(tidyverse)
+library(reshape2)
+view(Boston)
+zn=lm(Boston$crim~Boston$zn)
+indus=lm(Boston$crim~Boston$indus)
+chas=lm(Boston$crim~Boston$chas)
+nox=lm(Boston$crim~Boston$nox)
+rm=lm(Boston$crim~Boston$rm)
+age=lm(Boston$crim~Boston$age)
+dis=lm(Boston$crim~Boston$dis)
+rad=lm(Boston$crim~Boston$rad)
+tax=lm(Boston$crim~Boston$tax)
+ptratio=lm(Boston$crim~Boston$ptratio)
+black=lm(Boston$crim~Boston$black)
+lstat=lm(Boston$crim~Boston$lstat)
+medv=lm(Boston$crim~Boston$medv)
+summary(zn)
+summary(indus)
+summary(chas)
+summary(nox)
+summary(rm)
+summary(age)
+summary(dis)
+summary(rad)
+summary(tax)
+summary(ptratio)
+summary(black)
+summary(lstat)
+summary(medv)
+#Based on the p_values in the summaries, every prdictor except chas has relationship with crim, which the p value of those prdictor is lower than 0.05.  
+bos <- melt(Boston, id="crim")
+ggplot(bos, aes(x=value, y=crim)) +
+  facet_wrap(~variable, scales="free") + 
+  geom_point()
+
+#(b) Fit a multiple regression model to predict the response using all of the predictors. Describe your results. For which predictors can we reject the null hypothesis H0 : βj = 0?
+
+all=lm(crim~.,data=Boston)
+summary(all)
+# we can reject that prdictor zn,dis, rad,black, and medv, which reject their null hypothesis H0 : βj = 0. 
+
+#(c) How do your results from (a) compare to your results from (b)? Create a plot displaying the univariate regression coefficients from (a) on the x-axis, and the multiple regression coefficients from (b) on the y-axis. That is, each predictor is displayed as a single point in the plot. Its coefficient in a simple linear regression model is shown on the x-axis, and its coefficient estimate in the multiple linear regression model is shown on the y-axis.
+
+#the result of (a),(b) is different.
+a = c(coefficients(zn)[2],
+      coefficients(indus)[2],
+      coefficients(chas)[2],
+      coefficients(nox)[2],
+      coefficients(rm)[2],
+      coefficients(age)[2],
+      coefficients(dis)[2],
+      coefficients(rad)[2],
+      coefficients(tax)[2],
+      coefficients(ptratio)[2],
+      coefficients(black)[2],
+      coefficients(lstat)[2],
+      coefficients(medv)[2])
+b = coefficients(all)[2:14]
+plot(a,b)
+
+#(d) Is there evidence of non-linear association between any of the predictors and the response? To answer this question, for each predictor X, fit a model of the form Y = β0 + β1X + β2X2 + β3X3 + e.
+dzn = lm(Boston$crim~poly(Boston$zn,3))
+summary(dzn)
+dindus= lm(Boston$crim~poly(Boston$indus,3))
+summary(dindus) 
+dnox = lm(Boston$crim~poly(Boston$nox,3))
+summary(dnox) 
+drm= lm(Boston$crim~poly(Boston$rm,3))
+summary(drm) 
+dage = lm(Boston$crim~poly(Boston$age,3))
+summary(dage) 
+ddis= lm(Boston$crim~poly(Boston$dis,3))
+summary(ddis) 
+drad = lm(Boston$crim~poly(Boston$rad,3))
+summary(drad) 
+dtax= lm(Boston$crim~poly(Boston$tax,3))
+summary(dtax) 
+dptratio= lm(Boston$crim~poly(Boston$ptratio,3))
+summary(dptratio) 
+dblack= lm(Boston$crim~poly(Boston$black,3))
+summary(dblack) 
+dlstat = lm(Boston$crim~poly(Boston$lstat,3))
+summary(dlstat) 
+dmedv= lm(Boston$crim~poly(Boston$medv,3))
+summary(dmedv) 
+#zn,rm,rad,tax,black,lstat's cubic model has a p-value that is not statistical siginificant. 
+#indus,nox,age,dis,ptratio,medv's cubic model has a p-value that is statistical siginificant, which is enough evidence. 
+
+```
+
+6. Suppose we collect data for a group of students in a statistics class with variables X1 = hours studied, X2 = undergrad GPA, and Y =
+receive an A. We fit a logistic regression and produce estimated
+coefficient, βˆ0 = −6, βˆ1 = 0.05, βˆ2 = 1.
+(a) Estimate the probability that a student who studies for 40 h and
+has an undergrad GPA of 3.5 gets an A in the class.
+
+(b) How many hours would the student in part (a) need to study to
+have a 50 % chance of getting an A in the class?
+
+**a)the probability is 37.75%,b) the student need to study 50 hours. **
+**For the process of this question, please see the attached photo**

@@ -1,0 +1,158 @@
+
+---
+title: "hw3"
+author: "Yating Tian"
+date: "12/13/2021"
+output: html_document
+---
+### part 1
+
+```{r setup, include=FALSE}
+
+if (!require("png")) {
+  install.packages("png")
+}
+if (!require("imager")) {
+  install.packages("imager")
+  stopifnot(require("imager"))
+}
+```
+
+## main filter function
+```{r}
+
+photo = function(matric,k){
+  n=dim(matric)[1]
+  m=dim(matric)[2]
+  print(k)
+  print(matric)
+  matric.pad= matrix(0, n+2*k, m+2*k)
+  matric.pad[(k+1):(n+k), (k+1):(m+k)] <- matric
+  n.pad=n+2*k
+  m.pad=m+2*k
+  matric.avg<- matrix(0, n.pad, m.pad)
+  for(x in (k+1):(n+k)){
+       for(y in (k+1):(m+k)){
+         total=sum(matric.pad[(x-k):(x+k),(y-k):(y+k)])
+         matric.avg[x,y]=(total/((2*k+1)*(2*k+1)))
+            }
+      }
+  shrink.pad= matric.avg[(k+1):(n+k), (k+1):(m+k)]
+  return(shrink.pad)
+}
+
+photo = function(matric,k){
+  
+  avg=function(x){}
+  
+  
+}
+
+```
+
+## get data
+```{r}
+
+library(parallel)
+library(MASS)
+van_gogh <- readPNG("Van_Gogh.png")
+r.van_gogh <- van_gogh[,,1]; g.van_gogh <- van_gogh[,,2]; b.van_gogh <- van_gogh[,,3]
+l=1
+n=detectCores()
+n
+dim(r.van_gogh)
+a=table(apply(r.van_gogh,1, paste,collapse=""))
+
+mclapply(c(a,1), photo, mc.cores = 1,k=1)
+
+r.van_gogh
+r1=photo(r.van_gogh,1); g1=photo(g.van_gogh,1);b1=photo(b.van_gogh,1)
+r3=photo(r.van_gogh,3);g3=photo(g.van_gogh,3); b3=photo(b.van_gogh,3)
+r5=photo(r.van_gogh,5);g5=photo(g.van_gogh,5) ;b5=photo(b.van_gogh,5)
+```
+
+## output the image
+```{r}
+k1png=array(c(r1,g1,b1),dim=c(dim(van_gogh)[1],dim(van_gogh)[2],dim(van_gogh)[3]))
+writePNG(k1png,"USERNAME_1.png")
+```
+
+![image not showing](C:/Users/Yatin/Documents/fall2021/stat305/USERNAME_1.png)
+```{r}
+k3png=array(c(r3,g3,b3),dim=c(dim(van_gogh)[1],dim(van_gogh)[2],dim(van_gogh)[3]))
+writePNG(k3png,"USERNAME_3.png")
+```
+![image not showing](C:/Users/Yatin/Documents/fall2021/stat305/USERNAME_3.png)
+
+```{r}
+k5png=array(c(r5,g5,b5),dim=c(dim(van_gogh)[1],dim(van_gogh)[2],dim(van_gogh)[3]))
+writePNG(k5png,"USERNAME_5.png")
+
+```
+![image not showing](C:/Users/Yatin/Documents/fall2021/stat305/USERNAME_5.png)
+
+### part 2
+
+## sd filter function##
+```{r}
+
+photo_sd = function(matric,k){
+  n=dim(matric)[1]
+  m=dim(matric)[2]
+  matric.pad= matrix(0, n+2*k, m+2*k)
+  matric.pad[(k+1):(n+k), (k+1):(m+k)] <- matric
+  n.pad=n+2*k
+  m.pad=m+2*k
+  matric.sd<- matrix(0, n.pad, m.pad)
+  for(x in (k+1):(n+k)){
+       for(y in (k+1):(m+k)){
+         matric.avg=sum(matric.pad[(x-k):(x+k),(y-k):(y+k)])/((2*k+1)*(2*k+1))
+         matric.sd[x,y]= sqrt((matric.pad[x,y] - matric.avg)^2/((2*k+1)*(2*k+1)))
+            }
+      }
+  shrink.pad= matric.sd[(k+1):(n+k), (k+1):(m+k)]
+  return(shrink.pad)
+}
+
+```
+
+## get the edge of van gogh##
+```{r}
+rsd=photo_sd(g.van_gogh,1)
+l=round(length(rsd)*0.95)
+top10=rsd>rsd[order(rsd)][l]
+top10=top10*1
+e1=array(c(top10,1,1),dim=c(dim(van_gogh)[1],dim(van_gogh)[2],dim(van_gogh)[3]))
+writePNG(e1,"edge_vg.png")
+```
+
+![image not showing](C:/Users/Yatin/Documents/fall2021/stat305/edge_vg.png)
+
+## get the edge of madison ##
+```{r}
+madison <- readPNG("Madison.png")
+
+r.madison <- madison[,,1]
+r.madison.sd=photo_sd(r.madison,1)
+l1=round(length(r.madison.sd)*0.95)
+top10_madi=r.madison.sd>r.madison.sd[order(r.madison.sd)][l]
+top10_madi=top10_madi*1
+e2=array(c(top10_madi,1,1),dim=c(dim(madison)[1],dim(madison)[2],dim(madison)[3]))
+writePNG(e2,"edge_madison.png")
+```
+
+
+![image not showing](C:/Users/Yatin/Documents/fall2021/stat305/edge_madison.png)
+
+## Answer for question 1
+
+The edging detection by red channel is showing the waving feature of the painting.
+we can see there is more color change in the bird are and the land area, reletively less
+color change in the sky.
+
+## Answer for question 2
+
+We can see the road distribution of madison, and also see the lake area because there
+is relatively less color change. 
+
+

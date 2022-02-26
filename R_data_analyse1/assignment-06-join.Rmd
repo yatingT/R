@@ -1,0 +1,280 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+library(tidyverse)
+library(lubridate)
+library(zipcode)
+
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+## Assignment 6
+
+### Yating Tian
+
+#### Due Thursday, October 17
+
+The purpose of this assignment is to review many of the skills
+you have gained so far in data transformations and analysis.
+Turn in an HTML file and this R Markdown file after you have edited it.
+
+### Data
+
+The data are in files `obesity-hw.csv`, `rural-urban.csv`,
+`education.csv`, and `income.csv`.
+The obesity data set has one row for each zip code by age and sex cohort.
+The other files have one row per zip code (and have far fewer variables than the original files as we manipulated the data in class).
+
+### Problems
+
+### 1
+
+> Transform and combine the data sets so that you have two rows for each zip code (one row for each sex) and the following columns of data. Note that you will need to eliminate the data on obesity among children and summarize the data across age cohorts within each zip code to accomplish this task.
+
+- `zip` = zip code
+- `sex` = sex (male or female)
+- `adult_n` = estimated # of adults (of that sex)
+- `obese_n` = estimated # of obese adults (of that sex)
+- `obese_p` = estimated proportion of obese adults (of that sex)
+- `pct_bach` = % adults (aged 25+, of the given sex) with at least a bachelors degree
+
+```{r}
+obesity = read_csv("obesity-hw.csv") %>%
+  mutate(zip=clean.zipcodes(zip))
+education=read.csv("education.csv") %>% 
+  mutate(zip=clean.zipcodes(zip))
+  
+obesity1=obesity %>% 
+  drop_na() %>% 
+  filter(age != "05-17") %>% 
+  mutate(obese_n=pop*obese/bmi) %>% 
+  group_by(zip,sex) %>% 
+  summarise(adult_n=sum(pop),
+            obese_o=sum(obese_n),
+            obese_p=sum(obese_n/adult_n))
+
+education=education %>% 
+  rename(female=pct_f_bach,
+         male=pct_m_bach) %>% 
+  gather(key = sex, value = pct_bach,female,male) %>% 
+  arrange(zip,sex)
+
+obesity1=left_join(obesity1,education, by=c("zip","sex"))
+head(obesity1)
+```
+
+### 2
+
+> Using the data from Question 1,
+calculate the estimated percentages of obese adults in Wisconsin separately by sex and education and display these values in a 2 by 2 table. State any assumptions you need to make when making these calculations. (Recall that you need to sum up totals of people before finding proportions.)
+
+```{r}
+obesity2 = obesity1 %>%
+  mutate(pct_bach_p=pct_bach/100,
+         non_bach_p=1-pct_bach_p,
+         obese_n=adult_n-obese_o,
+         non_obese_p=1-obese_p,
+         obese_bach=obese_o*pct_bach_p,
+         non_obese_bach=obese_n*pct_bach_p,
+         obese_non_bach=obese_o*non_bach_p,
+         non_obese_non_bach=obese_n*non_bach_p)
+
+obesity2 %>%   
+  ungroup()%>%
+  select(sex,contains("bach")) %>% 
+  group_by(sex) %>% 
+  summarise_all(sum) %>% 
+  mutate(bach_total=obese_bach+non_obese_bach,
+         non_bach_total=obese_non_bach+non_obese_non_bach,
+         obese_bach_rate=obese_bach/bach_total,
+         obese_non_bach_rate=obese_non_bach/non_bach_total) %>%  
+  select(sex, contains("rate"))
+
+  
+```
+
+### 3
+
+> Make a scatter plot which displays the proportion of a zip code aged 25+ with a bachelor's degree by sex on the x-axis and the proportion obese by sex on the y axis. Use different colors for each sex and add a trend line or curve for each sex.
+Create appropriate labels and titles for the plot.
+Comment on any apparent patterns in the data.
+
+```{r}
+ggplot(obesity2, aes(x=pct_bach_p, y=obese_p,color=sex))+
+  geom_point()+
+  geom_smooth(se=FALSE)+
+  xlab("% with bachelors")+
+  ylab("% obese")+
+  ggtitle("relationship between obesity prevalence and education level by zipcode")
+
+```
+### response
+the pattern shows that the education and obesity have negetive direct relationship. In other word, the higher education, like bachelor degree, the lower chance to get obese. 
+
+
+### 4
+
+> Transform and combine the data sets so that you have one row for each zip code and the following columns of data. Note that you will need to eliminate the data on obesity among children and summarize the obesity data across age and sex cohorts within each zip code to accomplish this task.
+
+- `zip` = zip code
+- `adult_n` = estimated # of adults
+- `obese_n` = estimated # of obese adults
+- `non_obese_n` = estimated # of non-obese adults
+- `obese_p` = estimated proportion of obese adults
+- `households` = # of households 
+- `median income` = median household income
+
+```{r}
+obesity4=obesity %>% 
+  drop_na() %>% 
+  filter(age != "05-17") %>% 
+  mutate(obese_n=pop*obese/bmi,
+         non_obese_n=pop-obese_n) %>% 
+  group_by(zip) %>% 
+  summarise(adult_n=sum(pop),
+            obese_o=sum(obese_n),
+            non_obese_n=sum(non_obese_n),
+            obese_p=sum(obese_o/adult_n))
+
+income=read.csv("income.csv") %>% 
+  mutate(zip=clean.zipcodes(zip))
+
+obesity4= obesity4 %>% 
+  left_join(income, by="zip") %>% 
+  drop_na()
+
+obesity4
+```
+
+### 5
+
+> Associate with every adult in the Wisconsin the median household income from the zip code in which they reside. Calculate the mean of these values for obese and non-obese adults for the state.
+
+```{r}
+obesity5=obesity4 %>%
+  mutate(income_o=obese_o*income,
+         income_n=non_obese_n*income) 
+
+obesity5a=obesity5 %>%
+  summarise(avg_income_o=sum(income_o)/sum(obese_o),
+            avg_income_n=sum(income_n)/sum(non_obese_n)) %>% 
+  select(contains("avg"))
+
+obesity5a
+  
+```
+
+### 6
+
+> Make a scatter plot with one point for each zip code with the median household income on the x-axis and the percentage of obese adults on the y-axis. Make the area of the points proportional to the number of households represented (check out the `size` aesthetic).
+Create appropriate labels and titles for the plot.
+Add a trend line/curve and comment on any apparent patterns.
+
+```{r}
+ggplot(obesity4, aes(x=income,y=obese_p*100,size=households ))+
+  geom_point() +
+  geom_smooth(se=FALSE)+
+  xlab("Income")+
+  ylab("% of obese")+
+  ggtitle("the ration ship between the income and obese")
+
+#higher obisity persentage on the riral area , relitivety lower obisity rate in urban area. 
+```
+### Response
+people gets 30000 and less have more chance, about 50% to get obese. The household with 30K income or higher, there is trend that the more income, the less chance to get obese. 
+
+### 7
+
+Transform and combine the data sets so that you have five rows for each zip code (one row for each age cohort) and the following columns of data. Note that you will need to summarize the data across sex cohorts within each zip code to accomplish this task.
+
+- `zip` = zip code
+- `age` = age range
+- `pop_n` = estimated # of individuals
+- `obese_n` = estimated # of obese individuals
+- `obese_p` = estimated proportion of obese individuals
+- `rural_n` = estimated # of individuals who live in a rural household
+- `urban_n` = estimated # of individuals who live in an urban household
+
+```{r}
+obesity7=obesity %>% 
+  #drop_na() %>% 
+  group_by(zip,age) %>% 
+  select(-sex) %>% 
+  summarise_all(sum) %>% 
+  mutate(pop_n=pop,
+         obese_n=(obese/bmi)*pop_n,
+         obese_p=obese_n/pop_n)
+
+ru=read.csv("rural-urban.csv") %>% 
+  mutate(zip=clean.zipcodes(zip))
+
+obesity7= obesity7 %>% 
+  left_join(ru, by="zip") %>% 
+  mutate(rural_n=(1-p_urban)*pop_n,
+         urban_n=p_urban*pop_n) %>% 
+  select(zip,age,pop_n,obese_n,obese_p,rural_n,urban_n,p_urban,)
+  
+obesity7
+
+```
+
+### 8
+
+> Calculate the estimated percentage of obese individuals by age range and if they live in an urban or rural household.
+Display these values in a 5 by 2 table with one row for each age range and seprate columns for rural and urban.
+
+```{r}
+obesity7=obesity7 %>% 
+  mutate(ro=rural_n*obese_p,
+         uo=urban_n*obese_p)%>% 
+  drop_na() 
+
+obesity7 %>% 
+  group_by(age) %>% 
+  summarise(rot=sum(ro),
+            uot=sum(uo),
+            rpop=sum(rural_n),
+            upop=sum(urban_n)) %>% 
+  mutate(ro_rate=rot/rpop,
+         uo_rate=uot/upop) %>% 
+  select(age,ro_rate,uo_rate)
+```
+
+### 9
+
+> Create a scatter plot with a point for each zip code and age range to show percentage urban on the x-axis and percentage obese on the y-axis. Use faceting to display the points in different panels of the plot for each age range.
+Create appropriate labels and titles for the plot.
+Comment on any patterns in the plot.
+
+```{r}
+obesity7 %>% 
+  ggplot(aes(x=p_urban,y=obese_p))+
+  geom_point()+
+  geom_smooth(se=FALSE)+
+  facet_wrap(~age)+
+  xlab("percentage urban")+
+  ylab("percentage obese")+
+  ggtitle("ralationship between the obese and living in urban")
+  
+```
+

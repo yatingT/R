@@ -1,0 +1,190 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+library(tidyverse)
+library(lubridate)
+library(zipcode)
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_colour_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+## Assignment 3
+
+## YOUR NAME
+
+#### Due Thursday, September 26
+
+The purpose of this assignment is to give you practice using dplyr commands and to review ggplot2 commands on multiple data sets.
+
+Turn in an HTML file and this R Markdown file after you have edited it.
+
+### Data
+
+Some questions use the Madison Weather data set
+and some questions use the Seattle pets data set.
+Both data sets are available from Canvas.
+
+```{r read-data}
+## Read and transform the Madison weather data
+
+breaks = seq(1868,2018,30)
+labels = str_c((breaks+1)[-6],breaks[-1],sep="-")
+
+mw = read_csv("madison-weather.csv",
+              col_types = cols(
+  STATION = col_character(),
+  NAME = col_character(),
+  LATITUDE = col_double(),
+  LONGITUDE = col_double(),
+  ELEVATION = col_double(),
+  DATE = col_date(format = ""),
+  AWND = col_double(),
+  PRCP = col_double(),
+  SNOW = col_double(),
+  SNWD = col_double(),
+  TAVG = col_double(),
+  TMAX = col_double(),
+  TMIN = col_double(),
+  WSF1 = col_double())) %>%
+  mutate(NAME = recode(NAME,
+                       "ARBORETUM UNIVERSITY WIS, WI US" = "Arboretum",
+                       "CHARMANY FARM, WI US" = "Charmany",
+                       "MADISON DANE CO REGIONAL AIRPORT, WI US" = "Airport",
+                       "MADISON WEATHER BUREAU CITY, WI US" = "Bureau")) %>%
+  select(NAME,DATE,PRCP,SNOW,TMAX,TMIN) %>%
+  rename(name = NAME,
+         date = DATE,
+         prcp = PRCP,
+         snow = SNOW,
+         tmax = TMAX,
+         tmin = TMIN) %>%
+  filter(name == "Airport" | (name == "Bureau" & date < "1939-10-01") ) %>%
+  select(-snow) %>%
+  drop_na() %>%
+  mutate(tavg = (tmin+tmax)/2) %>%
+  mutate(year = year(date)) %>%
+  mutate(month = month(date, label=TRUE)) %>%
+  mutate(day = day(date)) %>%
+  filter(year < 2019) %>%
+  mutate(period = cut(year,
+                      breaks = breaks,
+                      labels = labels))
+
+## Remove breaks and labels from the global environment
+rm(breaks, labels)
+
+## Read the Seattle pets data
+pets = read_csv("seattle_pets.csv") %>%
+  mutate(zip_code = clean.zipcodes(zip_code))
+```
+
+### Problems
+
+### Madison Weather Problems
+
+### 1
+
+> This problem is about extreme temperature events in Madison. Create a table named extreme-temps that has one row per month and day (so 366 rows) with columns named: (1) max_high; (2) min_high; (3) max_low; and (4) min_low. The max_high column should contain the highest maximum temperature observed on the given month/day (max(tmax)) and the min_high variable should have the smallest high temperature for the day (min(tmax)). The columns max_low and mon_low are defined similarly for tmin.
+
+```{r problem-1}
+
+```
+
+### 2
+
+> Create a plot with a line segment from min_high to max_high for each day of the year. Use geom_segment() to add the lines and use a facet command (either facet_wrap() or facet_grid()) to draw the lines for each month in a different panel.
+
+```{r problem-2}
+
+```
+
+### 3
+
+> Do the same as the previous problem for the max_low and mon_low variables.
+
+```{r problem-3}
+
+```
+
+### 4
+
+> Filter the Madison weather data set to keep only days that achieve the record high temperature for that day and select the period, year, month, day, and tmax variables. 
+
+```{r problem-4}
+
+```
+
+### 5
+
+> Use the data from the previous problem. Count for every year the number of extreme high temperature events that occur. Plot these counts by year and add a trend line/curve. Does it appear that the rate of hottest ever days is increasing?
+
+```{r problem-5}
+
+```
+
+### Response
+
+XXX
+
+### 6
+
+> Repeat the two previous problems for the record low temperatures.
+
+```{r problem-6}
+
+```
+
+### Response
+
+XXX
+
+### Seattle Pets Problems
+
+Before completing these problems,
+copy the code from your discussion solution problem 1
+to transform the Seattle pet data by filtering out some rows,
+renaming some columns,
+and selecting some columns.
+
+### 7
+
+> Identify the zip codes where the AGI is higher than $175,000 (approximately the wealthiest ten percent of the zip codes). What are the most popular breeds of dogs and cats in this zip code? What are the most popular pet names among cats and dogs in this zip code?
+
+```{r problem-7}
+
+```
+
+### 8
+
+> Identify the zip codes where the AGI is lower than $55,000 (approximately the poorest ten percent of the zip codes). What are the most popular breeds of dogs and cats in this zip code? What are the most popular pet names among cats and dogs in this zip code?
+
+```{r problem-8}
+
+```
+
+### 9
+
+> Find the most popular breed of dog in each zip code. Create a table that counts the number of zip codes for which each dog breed is the most popular.
+
+```{r problem-9}
+
+```

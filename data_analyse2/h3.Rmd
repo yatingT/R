@@ -1,0 +1,129 @@
+---
+title: "Homework 3 for Stat 340; Estimation"
+author: "Karl Rohe"
+output: html_document
+---
+  
+###  Green Bay Packers
+  
+The Green Bay Packers won 13 of their 16 regular season games this year (2019). Propose a statistical model with random variables for their wins and loses.  We will estimate their win probabilty as $13/16 \approx .81$  Generate a 90% confidence interval for the true probability.  Notice that you need to do it differently for a 90% probabillity.  
+
+```{r}
+p=0.81
+n=16
+x=13
+simulate=rbinom(10000,n,p)/n
+hist(simulate,  main = paste("n =", n, ", p =",p))
+qs = quantile(simulate, prob = c(.05, .95))
+lines(qs[1]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(qs[2]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(p*c(1,1),c(0,10^9),col = "blue", lwd= 3)
+
+mean(simulate<qs)
+```
+
+### Counting the fish in Mendota
+
+In order to count the number of [Northern Pike](https://en.wikipedia.org/wiki/Northern_pike) in Lake Mendota,  we perform the following experiment.  We enlist a 100 fishers with 100 boats.  On the first weekend in June, all 100 go fishing for pike.  For every pike they catch, they tag it [like this](fishTag.png) and then release it back into the lake.  After the weekend, everyone reports back.  In total, they caught 558 pike.  Then, on the last weekend in July, they all go fishing for pike again.  This time, they caught 547 pike. Of those 547 fish, 8 of them had a tag.  
+
+Your job is to (1) estimate the number of pike in Lake Mendota and (2) create a 95% confidence interval for that estimate.  What assumptions do you need to make?
+
+  
+```{r}
+#1) the number of pike in Lake Mendota is total_pop=38153.25
+p_hat=8/547
+total_pop=558/p_hat
+
+#2)
+boots=rep(1,10000)
+for (i in 1:10000){
+  #i
+  d1=rpois(1,(547+558)/2)
+  d2=rpois(1,(547+558)/2)
+  #ii
+  t2=rbinom(1,d2,d1/total_pop)
+  #iii
+  total_pop_hat=(d1*d2)/t2
+  boots[i]=total_pop_hat
+}
+
+mean(boots>total_pop)
+
+hist(boots,  main = paste("n =", n, ", p =",p))
+qs = quantile(boots, prob = c(.025, .975))
+lines(qs[1]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(qs[2]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(total_pop*c(1,1),c(0,10^9),col = "blue", lwd= 3)
+
+
+
+#assumption: 
+# 1, independence, the number of success is independence with each other. 
+#2, we must have fixed period of time. 
+```
+  
+  
+###  Old school vs New school
+  
+Over the past 7 seasons, the Green Bay Packers have won  66 of the 111 games that they have played.  We wish to test the null hypothesis $H_0:$ Each win can be modeled as an independent Bernoulli(1/2) random variable.  
+
+a) Generate a p-value using the logic of statistical testing. (New school!)   
+b) Generate a p-valeu using the central limit theorem.  That is, under the null hypothesis, the proportion of wins can be modeled as (approximately) a normal random variable.  Hint: the standard error for the proportion of wins in 111 independent Bernoulli(1/2) trials is $.5/\sqrt{111}$.  (Old School!)    
+c)  In the logic of statistical testing, step 3 says to generate the test statistic lots and lots of times using the null model.  In part a), when you do that for this problem, compute the standard deviation of those test values with the R function sd.  Compare that value to 
+```{r} 
+se=.5/sqrt(111)
+```
+d)  Repeat these steps for the Green Bay Packers example in *Homework 2* (i.e. the last homework).  In that example, the standard error for the proportion of wins in 16 independent Bernoulli(1/2) trials is $.5/\sqrt{16}$.  What are the p-values from the new school (homework 2) and the old school (using CLT)? In step 3 of the logic of statistical testing, compute the standard deviation of the test statistics.  Compare that standard deviation to  $.5/\sqrt{16}$.    
+e)  Compare the p-values from step a and step b.  They should be very close!  Compare the p-values in step d.  They should be different!  However, in both cases, the simulated data should have a standard deviation equal to $.5/\sqrt{n}$, where $n$ is the number of games.  How can this all be true?  (This could be an exam question.  I would expect it to be hard.)
+```{r}
+#a)
+#h0, the probability to win a game is 0.5
+#ha, the probability to win a game is significantly higher than 0.5. 
+x=66
+n=111
+p=x/n
+stimu=rbinom(1000000,n,0.5)/n
+p1=mean(stimu>=p)
+p1
+
+#b)
+p2=(1-pnorm(p,0.5,.5/sqrt(111)))
+p2
+
+#c)
+sd=sd(stimu)
+se=.5/sqrt(111)
+sd
+se
+#d)
+dx=13
+dn=16
+dp=13/16
+stimulate=rbinom(10000,dn,0.5)/dn
+dp1=mean(stimulate>=dp)
+dp2=(1-pnorm(dp,0.5,.5/sqrt(dn)))
+dse=.5/sqrt(dn)
+dsd=sd(stimulate)
+
+
+#e)
+# the p value here is kind close.
+p1
+p2
+ 
+#when n=16, the p1 is almost double of the p2. 
+dp1
+dp2
+
+#every set of sd is almost same as se.
+sd
+se
+
+dsd
+dse
+
+#the simulated data has standard deviation equal to .5/sqrt(n) is because that the difinition of sd is how measure of the amount of variation or dispersion of data, and while we doing the boots strapping, we create a set of data for stimulation. Therefore, the the standard error measures how far the sample mean of the data is likely to be from the true population mean, which means in the sitimulation/boots strping data, sd is same as se. 
+
+```
+
+

@@ -1,0 +1,407 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+library(tidyverse)
+library(lubridate)
+library(stringr)
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+```{r gnorm, include=FALSE}
+geom_norm_density = function(mu=0,sigma=1,a=NULL,b=NULL,color="blue",...)
+{
+  if ( is.null(a) )
+  {
+    a = qnorm(0.0001,mu,sigma)
+  }
+  if ( is.null(b) )
+  {
+    b = qnorm(0.9999,mu,sigma)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    y=dnorm(x,mu,sigma)
+  )
+  geom_line(data=df,aes(x=x,y=y),color=color,...)
+}
+
+geom_norm_fill = function(mu=0,sigma=1,a=NULL,b=NULL,
+                          fill="firebrick4",...)
+{
+  if ( is.null(a) )
+  {
+    a = qnorm(0.0001,mu,sigma)
+  }
+  if ( is.null(b) )
+  {
+    b = qnorm(0.9999,mu,sigma)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    ymin=rep(0,length(x)),
+    ymax = dnorm(x,mu,sigma)
+  )
+  geom_ribbon(data=df,aes(x=x,ymin=ymin,ymax=ymax),fill=fill,...)
+}
+
+gnorm = function(mu=0,sigma=1,a=NULL,b=NULL,color="blue",
+                 fill=NULL,title=TRUE,...)
+{
+  g = ggplot()
+  
+  if ( !is.null(fill) )
+    g = g + geom_norm_fill(mu,sigma,a,b,fill)
+  
+  g = g +
+    geom_norm_density(mu,sigma,a,b,color,...) +
+    geom_hline(yintercept=0) +
+    ylab('density')
+
+  if ( title )
+    g = g +
+      ggtitle(paste("N(",mu,",",sigma,")"))
+  return ( g )
+}
+```
+## Assignment 7
+
+### Yating Tian
+
+#### Due Monday, November 4
+
+The purpose of this assignment is to examine normal distributions and to practice writing functions.
+
+### Data
+
+The data are in files `madison-weather.csv` and `Police_Incident_Reports.csv`.
+Look at past code for code you can use to clean these data sets as needed for this assignment. (You need not do everything with the police data set that we did in class, for example).
+
+### Problems
+
+### 1
+
+> Using the Madison weather data, find all snowfall totals from the past 30 years (1988--2018) in the last week of October (25--31). Calculate the mean and standard deviation of this data.
+
+```{r}
+breaks = seq(1868,2018,30)
+labels = str_c((breaks+1)[-6],breaks[-1],sep="-")
+
+mw = read_csv("madison-weather.csv",
+              col_types = cols(
+  STATION = col_character(),
+  NAME = col_character(),
+  LATITUDE = col_double(),
+  LONGITUDE = col_double(),
+  ELEVATION = col_double(),
+  DATE = col_date(format = ""),
+  AWND = col_double(),
+  PRCP = col_double(),
+  SNOW = col_double(),
+  SNWD = col_double(),
+  TAVG = col_double(),
+  TMAX = col_double(),
+  TMIN = col_double(),
+  WSF1 = col_double())) %>%
+  mutate(NAME = recode(NAME,
+                       "ARBORETUM UNIVERSITY WIS, WI US" = "Arboretum",
+                       "CHARMANY FARM, WI US" = "Charmany",
+                       "MADISON DANE CO REGIONAL AIRPORT, WI US" = "Airport",
+                       "MADISON WEATHER BUREAU CITY, WI US" = "Bureau")) %>%
+  select(NAME,DATE,SNOW,SNWD) %>%
+  rename(name = NAME,
+         date = DATE,
+         snow = SNOW,
+         snwd = SNWD) %>%
+  filter(name == "Airport" | (name == "Bureau" & date < "1939-10-01") ) %>%
+##  select(-snow) %>%
+##  drop_na() %>%
+  #mutate(tavg = (tmin+tmax)/2) %>%
+  mutate(year = year(date)) %>%
+  mutate(month = month(date, label=TRUE)) %>%
+  mutate(day = day(date)) %>%
+  #filter(year < 2019) %>%
+  mutate(period = cut(year,
+                      breaks = breaks,
+                      labels = labels))
+
+## Remove breaks and labels from the global environment
+rm(breaks, labels)
+
+mw1= mw %>% 
+  select(date,year,month,day,snow) %>% 
+  filter(year>1988 & year<2019)%>% 
+  filter(month=="Oct") %>% 
+  filter(day>24)  
+  
+answer1=summarise(mw1,mean= mean(snow),
+                sd=sd(snow))
+
+answer1
+```
+
+### 2
+
+> Display the snowfall data from the previous problem in a density histogram (add the aesthetic `y=..density..`) and overlay a normal density curve with mean and standard deviation that match the sample statistics. Address the question, is a normal model a reasonable choice for the random variable daily snowfall duriing the last week of October in Madison, Wisconsin?
+
+```{r}
+ggplot(mw1, aes(x=snow))+
+  geom_histogram(aes(y=..density..,
+                 boundary=0,
+                 binwidth = 0.1))+
+  geom_density()+
+  geom_norm_density(mu=answer1$mean,
+                    sigma=answer1$sd)
+  
+```
+### response
+this is a normal distribution, althrough the historgram shows data locate about 0, but both density curve is the normal distribution. 
+### 3
+
+> The snowfall in Madison on October 29, 2019 was 3.0 inches. Write a function that takes two arguments, a sample of data `sample` and a single value `x`,
+that computes the mean and standard deviation of the sample and then returns the z-score of the value `x`. Use the function to calculate the z-score of the observation of 3.0 inches of snow relative to daily snowfall totals in the last week of October during the past 30 years in Madison. Calculate the probability that a normal random variable has this z-score or higher. Is this probability a reasonable estimate of how unusual it is to observe a snowfall of 3.0 or more inches in the last week of October? Briefly explain.
+
+```{r}
+z_score=function(sample,x){
+  mean=mean(sample)
+  sd=sd(sample)
+  z=(x-mean)/sd
+  return(z)
+}
+
+z3=z_score(mw1$snow,3)
+z3
+pnorm(1-z3)
+
+
+```
+###response
+the probability is a reasonable estimate of unusualness of the weather. it is very unural that we got that much snow as early as oct, 29. the posibility was super close to 0. 
+### 4
+
+> For the most recent 30 winters from the 1988--1989 through 2018--2019, define a variable `x` to be the number of days the date of the first measurable snowfall occurs **after October 1** of the given winter. Calculate this variable for the past 30 years and compute its mean and standard deviation. Display the data in a density histogram with a normal density curve overlayed. Calculate the z-score of the variable in a year when the first snowfall occurs on October 29. Assuming a normal distribution with the mean and standard deviation calculated from the past 30 years, what is the probability that the first snowfall is 28 or fewer days after October 1. Is this probability a reasonable estimate of how unusual it is for the first snowfall to be as early as October 29? Briefly explain.
+
+```{r}
+mw = mw %>% 
+  mutate(year1=case_when(month(date)<7 ~year(date) - 1,
+                         month(date)>6~ year(date))) %>% 
+  mutate(year2=year1+1) %>% 
+  unite(winter,year1,year2,sep = "-")
+
+mw2= mw %>% 
+  group_by(winter) %>%
+  filter(snow>0) %>% 
+  summarise(first=min(date)) %>% 
+  filter(winter>="1989-1990") %>% 
+  mutate(year=str_sub(winter,1,4)) %>% 
+  mutate(oct01=ymd(str_c(year,10,01,sep = "-"))) %>% 
+  mutate(range=as.numeric(first-oct01))
+
+a4=mw2 %>% 
+  ungroup() %>% 
+  summarise(mean=mean(range),
+            sd=sd(range))
+
+ggplot(mw2, aes(x=range))+
+  geom_histogram(aes(y=..density..),
+                 boundary=0,
+                 binwidth=7,
+                 color="black",
+                 fill="darkgreen")+
+  geom_density()+
+  geom_norm_density(mu=a4$mean,
+                    sigma=a4$sd)
+
+
+z28=z_score(mw2$range,28)
+z28
+probability=pnorm(z28)*100 
+probability
+
+
+##closed="left"
+## we never get the winter that fall snow after the new year, 
+  
+```
+
+### response 
+the probability to snow as early as Oct 29 is 23.5%. this means that based on the snow fall 28 days later than the Oct 1, we have about 1/5 percent chance to snow. 
+
+
+### 5
+
+> For the most recent 30 winters from the 1988--1989 through 2018--2019,
+calculate the date on which the cumulative snowfall first meets or exceeds 3 inches. (Check out the function `cumsum()`.) Define a variable `y` to be the number of days **after January 1** (so negative values are before January 1) that the cumulative snowfall first exceeds 3 inches. Calculate this variable for the past 30 years and compute its mean and standard deviation. Display the data in a density histogram with a normal density curve overlayed. Calculate the z-score of the variable in a year when the cumulative snowfall first meets or exceeds 3 inches on October 29, 64 days before January 1. Assuming a normal distribution with the mean and standard deviation calculated from the past 30 years, what is the probability that the cumulative snowfall first first exceeds 3 inches l is 28 or fewer days after October 1. Is this probability a reasonable estimate of how unusual it is for the first snowfall to be as early as October 29? Briefly explain.
+
+```{r}
+mw3= mw %>% 
+  group_by(winter) %>%
+  mutate(cumsum_snow=cumsum(snow)) %>% 
+  filter(cumsum_snow>3) %>% 
+  summarise(first=min(date)) %>% 
+  filter(winter>="1989-1990") %>% 
+  mutate(year=str_sub(winter,6,9)) %>% 
+  mutate(Jan01=ymd(str_c(year,01,01,sep = "-"))) %>% 
+  mutate(y=as.numeric(first-Jan01))
+
+a4=mw3 %>% 
+  ungroup() %>% 
+  summarise(mean=mean(y),
+            sd=sd(y))
+a4
+
+ggplot(mw3, aes(x=y))+
+  geom_histogram(aes(y=..density..),
+                 boundary=0,
+                 binwidth=7,
+                 color="black",
+                 fill="hotpink")+
+  geom_density()+
+  geom_norm_density(mu=a4$mean,
+                    sigma=a4$sd)
+
+
+z64=z_score(mw3$y,-64)
+z64
+probabilityp5=pnorm(z64)*100 
+probabilityp5
+
+```
+
+###response
+the probability to snow as early as Oct 29 is 0.8%. This means that based on the snow fall 64 days before than the Jan 1, we have about 1 percent,which is very low chance to snow. 
+
+### 6
+
+> Use the Madison police incident report. Write a function that attempts to identify if the text in the `Victim` category refers to a business, an individual person, a group of more than one person, or `NA`. Use this function and `mutate()` from `dplyr` to create add a new variable `Victim_type` to the data set. Begin by taking a random sample of 100 rows and writing code that works for this subset of cases. Then test the code on a different random sample of 100 rows. Make edits to the function to handle each of these cases correctly. When you are done editing your function, test it on one more random set of 100 rows and measure the accuracy. Report which lines, if any, your function gets wrong.
+
+```{r}
+police= read_csv("Police_Incident_Reports.csv")
+set.seed(10130)
+
+police1 = police %>%
+  sample_n(size=100) %>%
+  select(IncidentID,Victim) %>%
+  arrange(as.numeric(IncidentID))
+
+
+q6 = function(x)
+{
+  x_lower = str_to_lower(x)
+  df = tibble(x) %>%
+    mutate(type = case_when(
+      is.na(x) ~ as.character(NA),
+      str_detect(str_to_lower(x),"^n/a$") ~
+        as.character(NA),
+      str_detect(x_lower,"^unknown$") ~ as.character(NA),
+      str_detect(x_lower,"none") ~ as.character(NA),
+      str_detect(x_lower,"store") ~ "business",
+      str_detect(x_lower,"uw.madison") ~ "business",
+      str_detect(x_lower,"walgreens") ~ "business",
+      str_detect(x_lower,"sears") ~ "business",
+      str_detect(x_lower,"bank") ~ "business",
+      str_detect(x_lower,"kohl's") ~ "business",
+      str_detect(x_lower,"subway") ~ "business",
+      str_detect(x_lower,"one people") ~ "1",
+      str_detect(x_lower,"two people") ~ "2",
+      str_detect(x_lower,"three people") ~ "3",
+      str_detect(x_lower,"&") ~ "2",
+      str_detect(x_lower,"age") ~ as.character(str_count(x_lower,"age")),
+      str_detect(x_lower,"male") ~ as.character(str_count(x_lower,"male")),
+      str_detect(x_lower,"man") ~ as.character(str_count(x_lower,"man")),
+      str_detect(x_lower,"woman") ~ as.character(str_count(x_lower,"woman")),
+      str_detect(x_lower,"m/") ~ as.character(str_count(x_lower,"m/")),
+      str_detect(x_lower,"f/") ~ as.character(str_count(x_lower,"f/")),
+      str_detect(x_lower,"f,") ~ as.character(str_count(x_lower,"f,")),
+      str_detect(x_lower,"female") ~ as.character(str_count(x_lower,"female")),
+      str_detect(x_lower,"madison") ~ as.character(str_count(x_lower,"madison")),
+      TRUE ~ "X"
+    ))
+  return( pull(df,type) )
+}
+
+police1 = police1 %>%
+  mutate( type= q6(Victim),
+          Victim_type=case_when(
+            as.numeric(type)==1~ "an individual person",
+            as.numeric(type)>1 ~ "a group of more than one person",
+            type =="business" ~ "business",
+            is.na(type)~ as.character(NA),
+          TRUE ~ "X"))
+
+police1
+
+police1 %>% 
+  drop_na() %>% 
+  filter(Victim_type=="X")
+
+
+#print(police1,n=100)
+```
+```{r}
+set.seed(12367)
+police2= police %>%
+  sample_n(size=100) %>%
+  select(IncidentID,Victim) %>%
+  arrange(as.numeric(IncidentID))
+
+police2= police2 %>%
+  mutate( type= q6(Victim),
+          Victim_type=case_when(
+            as.numeric(type)==1~ "an individual person",
+            as.numeric(type)>1 ~ "a group of more than one person",
+            type =="business" ~ "business",
+            is.na(type)~ as.character(NA),
+          TRUE ~ "X"))
+police2
+
+police2 %>% 
+  drop_na() %>% 
+  filter(Victim_type=="X")
+
+
+```
+
+```{r}
+set.seed(10321)
+police3= police %>%
+  sample_n(size=100) %>%
+  select(IncidentID,Victim) %>%
+  arrange(as.numeric(IncidentID))
+
+police3= police3 %>%
+  mutate( type= q6(Victim),
+          Victim_type=case_when(
+            as.numeric(type)==1~ "an individual person",
+            as.numeric(type)>1 ~ "a group of more than one person",
+            type =="business" ~ "business",
+            is.na(type)~ as.character(NA),
+          TRUE ~ "X"))
+police3
+
+police3 %>% 
+  drop_na() %>% 
+  filter(Victim_type=="X")
+```
+

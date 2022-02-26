@@ -1,0 +1,478 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+```{r gbinom, include=FALSE}
+## old code to visualize the binomial distribution
+## I want to edit it to make it easier to use in conjunction
+## with other ggplot2 functions and arguments
+gbinom = function(n,p,scale=FALSE,
+                  a=ifelse(scale,floor(n*p-4*sqrt(n*p*(1-p))),0),
+                  b=ifelse(scale,ceiling(n*p+4*sqrt(n*p*(1-p))),n),
+                  main=NULL,...) {
+  # load the ggplot2
+  require(ggplot2)
+  # make sure a and b are integers
+  a = round(a)
+  b = round(b)
+  # make sure a < b
+  if(a > b) {
+    temp = a
+    a = b
+    b = temp
+  }
+  # make sure a and b are in range
+  if(a < 0)
+    a = 0
+  if(b > n)
+    b = n
+  # create the sequence of possible values to graph
+  x = seq(a,b)
+  # compute the probabilities to graph
+  probability = dbinom(x,n,p)
+  # Choose a title for the plot if one is not passed
+  if(is.null(main))
+    main = paste("Binomial(",n,",",signif(p,4),")")
+  
+  # save the graph as an object which can be returned
+  df = data.frame(x,probability)
+  graph = ggplot(df,aes(x=x,y=probability,xend=x,yend=0),...) +
+      geom_segment(...) +
+      xlab('x') +
+      ylab('Probability') +
+      geom_hline(yintercept=0) +
+      ggtitle(main)
+  # return the graph object, but do so invisibly so no output is shown on the screen
+  return ( graph )
+}
+```
+
+```{r gbeta, include=FALSE}
+geom_beta_density = function(alpha=1,beta=1,a=NULL,b=NULL,color="blue",...)
+{
+  if ( is.null(a) )
+  {
+    a = qbeta(0.0001,alpha,beta)
+  }
+  if ( is.null(b) )
+  {
+    b = qbeta(0.9999,alpha,beta)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    y=dbeta(x,alpha,beta)
+  )
+  geom_line(data=df,aes(x=x,y=y),color=color,...)
+}
+
+geom_beta_fill = function(alpha=1,beta=1,a=NULL,b=NULL,
+                          fill="firebrick4",...)
+{
+  if ( is.null(a) )
+  {
+    a = qbeta(0.0001,alpha,beta)
+  }
+  if ( is.null(b) )
+  {
+    b = qbeta(0.9999,alpha,beta)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    ymin=rep(0,length(x)),
+    ymax = dbeta(x,alpha,beta)
+  )
+  geom_ribbon(data=df,aes(x=x,ymin=ymin,ymax=ymax),fill=fill,...)
+}
+
+gbeta = function(alpha,beta,a=NULL,b=NULL,color="blue",fill=NULL,title=TRUE,...)
+{
+  tol = 1e-08
+  if ( alpha < tol || beta < tol )
+    stop("alpha and beta must be positive")
+  if ( is.null(a) || a < 0 )
+    a = 0
+  if ( is.null(b) || b < 0 )
+    b = 1
+  
+  g = ggplot()
+  
+  if ( !is.null(fill) )
+    g = g + geom_beta_fill(alpha,beta,a,b,fill)
+  
+  g = g +
+    geom_beta_density(alpha,beta,a,b,color,...) +
+    geom_hline(yintercept=0) +
+    xlab('x') +
+    ylab('density')
+
+  if ( title )
+    g = g +
+        ggtitle(paste("Beta(",signif(alpha,4),",",signif(beta,4),")"))
+  return ( g )
+}
+```
+
+```{r gchisq, include=FALSE}
+geom_chisq_density = function(v,a=NULL,b=NULL,color="blue",...)
+{
+  if ( is.null(a) )
+  {
+    a = qchisq(0.001,v)
+  }
+  if ( is.null(b) )
+  {
+    b = qchisq(0.999,v)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    y=dchisq(x,v)
+  )
+  geom_line(data=df,aes(x=x,y=y),color=color,...)
+}
+
+geom_chisq_fill = function(v=1,a=NULL,b=NULL,
+                          fill="firebrick4",...)
+{
+  if ( is.null(a) )
+  {
+    a = qchisq(0.0001,v)
+  }
+  if ( is.null(b) )
+  {
+    b = qchisq(0.9999,v)
+  }
+  x = seq(a,b,length.out=1001)
+  df = data.frame(
+    x=x,
+    ymin=rep(0,length(x)),
+    ymax = dchisq(x,v)
+  )
+  geom_ribbon(data=df,aes(x=x,ymin=ymin,ymax=ymax),fill=fill,...)
+}
+
+gchisq = function(v,a=NULL,b=NULL,color="blue",fill=NULL,title=TRUE,...)
+{
+  tol = 1e-08
+  if ( v < tol )
+    stop("v must be positive")
+  if ( is.null(a) || a < 0 )
+  {
+    if ( v > 2)
+    {
+      a = qchisq(0.005,v)
+    }
+    else
+      a = 0.01
+  }
+  if ( is.null(b) || b < 0 )
+    b = qchisq(0.995,v)
+  
+  g = ggplot()
+  
+  if ( !is.null(fill) )
+    g = g + geom_chisq_fill(v,a,b,fill)
+  
+  g = g +
+    geom_chisq_density(v,a,b,color,...) +
+    geom_hline(yintercept=0) +
+    xlab('x') +
+    ylab('density')
+
+  if ( title )
+    g = g +
+        ggtitle(paste("Chi-square(",signif(v,4),")"))
+  return ( g )
+}
+dbb = function(x,n,a,b,log=FALSE)
+{
+  log_d = lchoose(n,x) +
+    lbeta(x+a,n-x+b) -
+    lbeta(a,b)
+  if ( log )
+    return ( log_d )
+  return ( exp( log_d ) )
+}
+
+## This function assumes that the sample x_1,\ldots,x_m
+## (all assumed from the same beta-binomial distribution)
+## has been summarized into a vector of length n+1
+## with the tabulated counts for each outcome from 0 to n
+## The function returns the MLEs of the mean and variance
+mbb = function(x)
+{
+  n = length(x) - 1
+  m = sum(x)
+  mx = sum((0:n)*x)/m
+  vx = sum(x*(0:n - mx)^2)/m
+  return(tibble(mx,vx))
+}
+
+## Log-likelihood function for (mu,phi)
+## x are the counts from 0 to n
+## theta = c(mu,phi)
+lmpbb = function(theta,x)
+{
+  mu = theta[1]
+  phi = theta[2]
+  alpha = mu*phi
+  beta = (1-mu)*phi
+  n = length(x) - 1
+  return( sum(x*dbb(0:n,n,alpha,beta,log=TRUE)) )
+}
+mlebb = function(x)
+{
+  n = length(x)-1
+  moments = mbb(x)
+  mx = moments$mx
+  vx = moments$vx
+  mu_0 = mx/n
+  phi_0 = (n*n - vx)/(vx - n*mu_0*(1-mu_0))
+  opt = optim(c(mu_0,phi_0),lmpbb,x=x,
+              control = list(fnscale=-1),
+              method = "L-BFGS-B",
+              lower = c(1e-7,1e-7),
+              upper = c(1-1e-7,Inf))
+  df = tibble(
+    mu = opt$par[1],
+    phi = opt$par[2],
+    alpha = mu*phi,
+    beta = (1-mu)*phi,
+    logl = opt$value,
+    convergence = opt$convergence)
+  
+  return( df )
+}
+```
+
+## Assignment 9
+
+### Yating Tian
+
+#### Due Wednesday, November 27
+
+The purpose of this assignment is to review estimation and hypothesis tests from the family sex distribution data.
+
+### Data
+
+The data are in files `geissler.csv` and `danish-children.csv`.
+```{r}
+gei=read.csv("geissler.csv")
+dc=read.csv("danish-children.csv")
+```
+
+### Background
+
+Simple binomial models make predictions about the distributions for boys and girls among families.
+How do these models fit actual data?
+
+### Problems
+
+### 1
+
+> Following methods in lecture, examine the Geissler data set for a family size of 4 (which here means the distribution of boys and girls among families with 5 or more children). Test the suitability of a binomial model for this data versus the alternatives of the beta-binomial model and a general independence model with likelihood ratio tests. Summarize the results in context.
+
+```{r}
+###binomial D
+size4 = gei %>%
+  filter(size==4)
+x4=size4$freq
+p_hat = sum(x4*(0:4))/(4*sum(x4))
+logl_4 = sum(x4*dbinom(0:4,4,p_hat,log=TRUE))
+
+###bata
+bb_4= mlebb(x4)
+bb_4
+
+#
+G = -2 * (logl_4 - bb_4$logl)
+G
+
+p_value=1-pchisq(G,1)
+p_value### reject the null, because the p value less than 0.05, beta binomial works better than the binomial distrobution
+
+p_hat_2 = x4/sum(x4)
+logl_2 = sum(x4*log(p_hat_2))
+logl_2
+
+G2 = -2 * (logl_4 - logl_2)
+G2
+
+p_value_2 = 1 - pchisq(G2,5)
+p_value_2  ###reject the null as well, the general indipendence model works better than the binomial model. 
+
+```
+
+### 2
+
+> Find a 95% confidence interval for the difference in probabilities that a second child is a girl if the first child is a girl versus if the first child is a boy, using the Danish children data set for families with two or more children.
+Intepret the results in context.
+
+```{r}
+#dc2=dc %>% 
+#  filter(order>2) %>%
+#  mutate(first2=substr(previous,1,2))
+dc2a=dc %>% 
+  filter(order==2) %>% 
+  mutate(first2=str_c(previous,sex))
+
+dc_p=dc2a %>%
+  summarise(n_ff=n[1]+n[2],
+         n_mf=(n[3]+n[4]),
+        p_ff=n[1]/n_ff,
+         p_mf=n[3]/n_mf,
+        #se_ff=sqrt(p_ff*(1-p_ff)/n_ff),
+        # se_mf=sqrt(p_mf*(1-p_mf)/n_mf),
+        #a_ff=p_ff-1.96*se_ff,
+        #b_ff=p_ff+1.96*se_ff,
+        # a_mf=p_mf-1.96*se_mf,
+        # b_mf=p_mf+1.96*se_mf,
+        #diff=b_mf-a_ff,
+        est_diff = p_ff - p_mf,
+        se_diff = sqrt(p_ff*(1-p_ff)/n_ff+p_mf*(1-p_mf)/n_mf),
+        z = qnorm(0.975),
+        a_diff = est_diff - z * se_diff,
+        b_diff =est_diff + z * se_diff )
+
+dc_p
+##the diffwewnt range is from 0.002405359 to	0.007889633
+```
+
+### 3
+
+> Formally test the hypothesis that,
+given a family with one child decides to have another,
+that the probability that the second child is female is the same regardless of the sex of the first child versus the alternative that these probabilities are different.
+Intepret the results in context.
+
+```{r}
+
+#h0=p_ff=P_mf
+#ha=p_ff>p_mf
+
+
+###I think the P_hat 
+dc_p %>% 
+   summarize(est = p_ff - p_mf,
+            n_succ= dc2a$n[1]+dc2a$n[3],
+            n_1 = n_ff,
+            n_2 = n_mf,
+            n = n_ff+n_mf,
+            p_pool = n_succ/n,
+            se_pool = sqrt(p_pool*(1-p_pool)*(1/n_1 + 1/n_2)),
+            z = est / se_pool,
+            p_value = 2*pnorm(-abs(z)))
+
+##p value is 0.0002339758, reject the null. 
+```
+
+### 4
+
+> Find the number of families with 0, 1, and 2 girls among their first two children if they had more than one child. Fit a binomial model to this data. Test the binomial hypothesis versus the alternative that the distribution is not binomial with a likelihood ratio test using the Danish children data.
+Intepret the results in context.
+
+```{r}
+#dc4=dc %>% 
+#  filter(order>2) %>%
+#  mutate(first2=substr(previous,1,2),
+#         count=str_count(first2,"F"))
+#dc4a=dc %>% 
+#  filter(order==2,
+#         sex=="F") %>% 
+#  mutate(count=str_count(previous,"F")+1)
+#dc_4_higher=bind_rows(dc4a,dc4) %>%
+  
+###binomial D
+n_0=dc2a$n[1]
+n_1=dc2a$n[2]+dc2a$n[3]
+n_2=dc2a$n[4]
+x=c(n_0,n_1,n_2)
+p_hat4 = sum(x*(0:2))/(2*sum(x))
+logl_04 = sum(x*dbinom(0:2,2,p_hat,log=TRUE))
+logl_04
+
+#genral indipendence model
+p_hat4gi = x/sum(x)
+logl_14 = sum(x*log(p_hat4gi))
+logl_14
+
+G4 = 2 * (logl_14 - logl_04)
+G4
+
+p_value_4 = 1 - pchisq(G4,5)
+p_value_4  ###reject the null as well, the general indipendence model works better than the binomial model. the alternitive hypothsis is about 17.71316 accurate than the null hupothsis. 
+
+
+```
+
+### 5
+
+> Let $p_x$ be the probability that a child is a girl if the family has $x-1$ previous children who are all girls. Estimate these probabilities from the Danish children data.
+Test a hypothesis that these probabilites are all the same versus the alternative that they are not all the same using a likelihood ratio test.
+Intepret the results in context.
+
+
+#is this mean binomial and a geniral indipendence data
+```{r}
+#sum(dc$n)
+
+#dc5=dc %>% 
+#  filter(previous=="F"|previous=="FF"|previous=="FFF"|previous=="FFFF") %>% 
+#  filter(sex=="F") 
+
+#dc5a=dc %>% 
+#  filter(order>1) %>% 
+#  filter(sex=="F") %>% 
+#  group_by(order) %>% 
+#  summarise(ordern=sum(n))
+  
+#dc5b=left_join(dc5,dc5a) %>% 
+#  mutate(p=n/ordern)
+
+p5=dc %>% 
+  group_by(previous) %>% 
+  mutate(total=sum(n),
+         p=n/total) %>% 
+  filter(is.na(previous)|!str_detect(previous,"M")) %>% 
+  filter(sex=="F")
+
+p5p0=sum(p5$n)/sum(p5$total)
+
+logl_05 = sum(dbinom(p5$n,p5$total,p5p0,log=TRUE))
+
+logl_15 = sum(dbinom(p5$n,p5$total,p5$p,log = TRUE))
+logl_15
+
+G5 = -2 * (logl_05 - logl_15)
+G5
+##the H1 is -693901.5 times more likely than the null hypothesis. 
+###reject the null as well, the alternitive hypothsis works better than the binomial model. 
+```
+
+

@@ -1,0 +1,166 @@
+---
+title: "h2"
+author: "Yating Tian"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+```
+
+###  Green Bay Packers
+
+The Green Bay Packers won 13 of their 16 regular season games this year (2019).  Olivia Munn, hillarious actress and former girlfriend of Aaron Rogers, says the Packers are just so so. Use the Logic of Statistical Testing to test her hypothesis. Suppose each game is an independent and identically distributed Bernoulli(p) trial and test whether p=.5.
+
+```{r}
+#follow the logic of statistical testing:
+#1 Come up with a way to measure the thing
+  #h0: the p of winning the game is 0.5
+  #ha: the p of winning game is not 0.5
+x=13
+n=16
+estamateP=13/16
+
+#2 Come up with a plausible model for the statistic 
+
+#since this is a Bernolli(p), we should use binomial model
+p=0.5
+
+#3
+#Simulate from that model lots of times to find the distribution of the statistic under your simulation model.
+
+simulate=rbinom(10000,n,p)/n
+hist(simulate,  main = paste("n =", n, ", p =",p))
+qs = quantile(simulate, prob = c(.025, .975))
+lines(qs[1]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(qs[2]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+
+#4 Compare the simulation distribution to the observed value
+
+lines(estamateP*c(1,1),c(0,10^9),col = "blue", lwd= 3)
+#the blue line is the estamate p that packers got, which is far higher than the 97.5 % quantle of p=0.5. Thus, packer does have outsanding performence. 
+
+
+
+```
+
+```{r}
+
+#p-value
+1-pbinom(x,n,p)
+
+#p-value is less than 0.05, another evidence that packer is great
+```
+
+
+### Lie detection   
+
+Before you read this problem, write down a sequence of heads and tails of length 200 in the code chunk below.  *Make the sequence as random as possible.* Do this without using the computer to generate random numbers!  
+```{r}
+# Turn on caps lock and let it rip:
+
+pie = list(3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3,2,3,8,4,6,2,6,4,3,3,8,3,2,7,9,5,0,2,8,8,4,1,9,7,1,6,9,3,9,9,3,7,5,1,0,5,8,2,0,9,7,4,9,4,4,5,9,2,3,0,7,8,1,6,4,0,6,2,8,6,2,0,8,9,9,8,6,2,8,0,3,4,8,2,5,3,4,2,1,1,7,0,6,7,9,8,2,1,4,8,0,8,6,5,1,3,2,8,2,3,0,6,6,4,7,0,9,3,8,4,4,6,0,9,5,5,0,5,8,2,2,3,1,7,2,5,3,5,9,4,0,8,1,2,8,4,8,1,1,1,7,4,5,0,2,8,4,1,0,2,7,0,1,9,3,8,5,2,1,1,0,5,5,5,9,6,4,4,6,2,2,9,4,8,9,5,4,9,3,0,3,8,1,9)
+
+myFlips=c()
+
+for (i in pie){
+  if(i %% 2 == 0){
+    myFlips=c(myFlips,"H")
+  }else {
+    myFlips=c(myFlips,"T")
+  }
+}
+
+#nchar(myFlips)  #make sure it length 200
+coin=tibble(myFlips)
+coin_count=coin %>% 
+  mutate(myFlips=as.factor(myFlips)) %>% 
+  group_by(myFlips) %>% 
+  summarise(n=n())
+```
+
+
+If you haven't filled in myFlips, don't keep reading!  It will be way more fun if you do that first.  I promise.  
+
+You ask your friend to generate a sequence of 200 coin flips from a fair coin.  You want to test whether your friend is cheating (e.g. just writing down H's and T's like you were above) or if they are actually taking the time to flip a coin.  To do this, you are going to use the logic of statistical testing.   
+
+So, you need a test statistic that measures if they are cheating.  This test statistic should look different for cheaters than it should for non-cheaters.  That is what we want of a good test statistic.
+
+Use the length of the "longest run" of heads or tails.  For example, if a sequence of flips was HHTTTHT, then the length of the longest run is 3, because there were three T's in a row.  You inspect their sequence to see that the longest run has length 4.  Do you think your friend is cheating?  Use the logic of statistical testing and justify your answer.
+
+10 
+
+To help you out, here is how you simulate a sequence of heads/tails
+```{r}
+flips  = sample(c("H","T"), 200,replace=T)
+```
+and here is a function to compute the longest run
+```{r}
+# you are welcome to trust that this function works.
+# but I would encourage you to look at the function to ensure that it makes sense to you.
+#  if you find an error, please let me know!  :)
+
+longestRun = function(flips){
+  # the first flip is always a run of length 1.
+  MaxRunSoFar = 1
+  currentRun = 1
+  
+  for(i in 2:length(flips)){ # for every flip
+    # if it is equal to the last flip
+    if(flips[i]==flips[i-1]){
+      # then increase the length of the currentRun
+      currentRun = currentRun + 1
+      # and if the run is larger than the maxRunSoFar, redefine that.
+      if(currentRun>MaxRunSoFar) MaxRunSoFar = currentRun
+    }
+    # otherwise, 
+    if(flips[i]!=flips[i-1]){
+      # set the current run back to 1
+      currentRun=1
+  }
+  }
+  return(MaxRunSoFar)
+}
+
+flips  = function() sample(c("H","T"), 200,replace=T)
+
+#3
+alldata = rep(NA, 10000)
+for(i in 1:10000){
+  data= flips()
+  alldata[i]=longestRun(data)
+}
+
+
+```
+
+```{r}
+#h0 friend is cheating
+#h1 friend is not cheating
+
+# split up the characters:  
+x <-unlist(strsplit(myFlips, split = ""))  
+# find your longest run:
+longestRun(x)
+```
+
+```{r}
+#4 Compare
+hist(alldata)
+test_stat=mean(alldata)
+qs = quantile(alldata, prob = c(.025, .975))
+lines(qs[1]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(qs[2]*c(1,1), c(0,10^9), col = "red", lwd = 3)
+lines(longestRun(x)*c(1,1),c(0,10^9),col = "blue", lwd= 3)
+
+pvalue=mean(alldata>=10)
+pvalue
+
+# blue line is my longest run, which is 10, which is inside the 95% confidence interval. Moreover, the p value is larger than the 0.05. Therefore, we fail to reject the null hypothese that friend is cheating. 
+
+
+```
+
+I suspect that the easiest way to answer this question is with a for loop, because you are going to want to repeat the experiment lots of times.  
